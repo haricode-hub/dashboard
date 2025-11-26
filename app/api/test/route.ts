@@ -1,9 +1,13 @@
-// app/api/approvals/route.ts
+// app/api/test/route.ts
 import { NextResponse } from 'next/server';
 
 export async function GET() {
-    // New URL for the combined dashboard
-    const apiUrl = process.env.CUSTOMER_SERVICE_API_COMBINED;
+    // This endpoint preserves the old logic using the pending URL
+    // URL: http://192.168.3.245:8002/customer-service/api/v1/customers/pending
+    // Note: The user prompt asked to build this specific URL in a separate endpoint like /test
+
+    // We can hardcode the URL here as requested for the /test endpoint
+    const apiUrl = process.env.CUSTOMER_SERVICE_API_PENDING;
 
     if (!apiUrl) {
         return NextResponse.json({ error: "API URL not configured" }, { status: 500 });
@@ -54,40 +58,22 @@ export async function GET() {
     }
 
     try {
-        // Convert customer JSON -> approval-like structure
-        // Logic: if md is obbrn then module is OBBRN else FCUBS
-        const formatted = data.map((c: any) => {
-            const isObbrn = c.MD === 'OBBRN';
-            const sourceSystem = isObbrn ? 'OBBRN' : 'FCUBS';
-
-            // Map priority to Title Case
-            let priority = "Normal";
-            if (c.PRIORITY) {
-                const p = c.PRIORITY.toUpperCase();
-                if (p === 'HIGH') priority = 'High';
-                else if (p === 'LOW') priority = 'Low';
-                else priority = 'Normal';
-            }
-
-            return {
-                sourceSystem: sourceSystem,
-                module: c.MD || "Unknown",
-                txnId: c.REF_NO || c.CUSTOMER_NO || "N/A",
-                accountNumber: c.ACCOUNT_NO || "N/A",
-                accountCurrency: c.ACCOUNT_CCY || "",
-                customerNo: c.CUSTOMER_NO || "",
-                customerName: c.CUSTOMER_NAME || "Unknown",
-                branchCode: c.BR || "",
-                branchName: c.BRANCH_NAME || "",
-                amount: 0, // No amount in sample
-                status: c.STATUS || "Pending",
-                priority: priority,
-                makerId: c.MAKER_ID || "",
-                makerName: c.MAKER_NAME || "",
-                event: c.EV || "",
-                timestamp: new Date().toISOString() // No timestamp in sample
-            };
-        });
+        // Convert customer JSON -> approval-like structure (placeholders)
+        // Using the mapping from the original route.ts
+        const formatted = data.map((c: any) => ({
+            sourceSystem: "FCUBS",                          // placeholder
+            module: "CUSTOMER",                             // placeholder
+            txnId: c.CUSTOMER_NO || "N/A",                  // use customer ID as txn
+            accountNumber: c.CUSTOMER_NO || "N/A",          // Map Customer No to Account No as requested
+            customerName: c.CUSTOMER_NAME1 || "Unknown",
+            amount: 0,                                      // placeholder
+            branch: c.LOCAL_BRANCH || "000",
+            status: c.AUTH_STAT || "U",
+            ageMinutes: 5,                                  // placeholder
+            priority: "Normal",                             // placeholder
+            initiator: c.MAKER_ID || "SYSTEM",
+            timestamp: c.MAKER_DT_STAMP || new Date().toISOString()
+        }));
 
         return NextResponse.json(formatted);
     } catch (err) {

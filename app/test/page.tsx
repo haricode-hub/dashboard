@@ -7,32 +7,21 @@ interface Approval {
     module: string;
     txnId: string;
     accountNumber: string;
-    accountCurrency: string;
-    customerNo: string;
     customerName: string;
-    branchCode: string;
-    branchName: string;
     amount: number;
+    branch: string;
     status: string;
+    ageMinutes: number;
     priority: string;
-    makerId: string;
-    makerName: string;
-    event: string;
+    initiator: string;
     timestamp: string;
 }
 
-export default function ApprovalsCockpit() {
+export default function TestCockpit() {
     const [approvals, setApprovals] = useState<Approval[]>([]);
     const [loading, setLoading] = useState(true);
     const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
     const [selectedTxn, setSelectedTxn] = useState<string | null>(null);
-    const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 15;
-
-    const [selectedSystem, setSelectedSystem] = useState<string>("(All)");
-    const [selectedModule, setSelectedModule] = useState<string>("(All)");
-    const [selectedBranch, setSelectedBranch] = useState<string>("(All)");
-    const [selectedStatus, setSelectedStatus] = useState<string>("(All)");
 
     // Derived state for charts
     const systemCounts = approvals.reduce((acc, curr) => {
@@ -59,25 +48,11 @@ export default function ApprovalsCockpit() {
         width: `${(systemCounts[system] / approvals.length) * 100}%`
     }));
 
-    // Filter Options
-    const systems = Array.from(new Set(approvals.map(a => a.sourceSystem))).sort();
-    const modules = Array.from(new Set(approvals.map(a => a.module))).sort();
-    const branches = Array.from(new Set(approvals.map(a => a.branchCode))).sort();
-    const statuses = Array.from(new Set(approvals.map(a => a.status))).sort();
-
-    // Filter Logic
-    const filteredApprovals = approvals.filter(approval => {
-        if (selectedSystem !== "(All)" && approval.sourceSystem !== selectedSystem) return false;
-        if (selectedModule !== "(All)" && approval.module !== selectedModule) return false;
-        if (selectedBranch !== "(All)" && approval.branchCode !== selectedBranch) return false;
-        if (selectedStatus !== "(All)" && approval.status !== selectedStatus) return false;
-        return true;
-    });
-
     async function loadApprovals() {
         setLoading(true);
         try {
-            const res = await fetch('/api/approvals', { cache: "no-store" });
+            // CHANGED: Fetch from /api/test instead of /api/approvals
+            const res = await fetch('/api/test', { cache: "no-store" });
             const data = await res.json();
 
             if (Array.isArray(data)) {
@@ -106,29 +81,23 @@ export default function ApprovalsCockpit() {
         return () => clearInterval(interval);
     }, []);
 
-    // Pagination Logic (using filteredApprovals)
-    const totalPages = Math.ceil(filteredApprovals.length / itemsPerPage);
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const currentApprovals = filteredApprovals.slice(startIndex, startIndex + itemsPerPage);
-
-    const handlePageChange = (page: number) => {
-        if (page >= 1 && page <= totalPages) {
-            setCurrentPage(page);
-        }
+    const formatCurrency = (amount: number) => {
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'USD',
+            minimumFractionDigits: 2
+        }).format(amount);
     };
 
-    // Reset pagination when filters change
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [selectedSystem, selectedModule, selectedBranch, selectedStatus]);
+
 
     return (
         <div className="min-h-screen flex flex-col bg-[#f3f4f6]">
             {/* Top Header */}
             <header className="header-bar px-8 py-6 flex flex-col md:flex-row justify-between items-center shadow-md z-20 gap-6">
                 <div className="text-center md:text-left">
-                    <h1 className="text-xl font-bold tracking-wide uppercase">JMR Unified Supervisor Cockpit</h1>
-                    <p className="text-blue-200 text-xs mt-1 font-medium">Real-time Approval & Monitoring Dashboard</p>
+                    <h1 className="text-xl font-bold tracking-wide uppercase">JMR Unified Supervisor Cockpit (TEST)</h1>
+                    <p className="text-blue-200 text-xs mt-1 font-medium">Real-time Approval & Monitoring Dashboard - Test View</p>
                 </div>
 
                 <div className="flex items-center gap-6">
@@ -161,46 +130,26 @@ export default function ApprovalsCockpit() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                             <div className="w-full">
                                 <label className="text-xs font-bold text-slate-500 uppercase mb-2 block tracking-wide">System</label>
-                                <select
-                                    value={selectedSystem}
-                                    onChange={(e) => setSelectedSystem(e.target.value)}
-                                    className="form-select w-full bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5"
-                                >
+                                <select className="form-select w-full bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5">
                                     <option>(All)</option>
-                                    {systems.map(sys => <option key={sys} value={sys}>{sys}</option>)}
                                 </select>
                             </div>
                             <div className="w-full">
                                 <label className="text-xs font-bold text-slate-500 uppercase mb-2 block tracking-wide">Module</label>
-                                <select
-                                    value={selectedModule}
-                                    onChange={(e) => setSelectedModule(e.target.value)}
-                                    className="form-select w-full bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5"
-                                >
+                                <select className="form-select w-full bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5">
                                     <option>(All)</option>
-                                    {modules.map(mod => <option key={mod} value={mod}>{mod}</option>)}
                                 </select>
                             </div>
                             <div className="w-full">
                                 <label className="text-xs font-bold text-slate-500 uppercase mb-2 block tracking-wide">Branch</label>
-                                <select
-                                    value={selectedBranch}
-                                    onChange={(e) => setSelectedBranch(e.target.value)}
-                                    className="form-select w-full bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5"
-                                >
+                                <select className="form-select w-full bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5">
                                     <option>(All)</option>
-                                    {branches.map(br => <option key={br} value={br}>{br}</option>)}
                                 </select>
                             </div>
                             <div className="w-full">
                                 <label className="text-xs font-bold text-slate-500 uppercase mb-2 block tracking-wide">Status</label>
-                                <select
-                                    value={selectedStatus}
-                                    onChange={(e) => setSelectedStatus(e.target.value)}
-                                    className="form-select w-full bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5"
-                                >
-                                    <option>(All)</option>
-                                    {statuses.map(st => <option key={st} value={st}>{st}</option>)}
+                                <select className="form-select w-full bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5">
+                                    <option>(Pending)</option>
                                 </select>
                             </div>
                             <div className="w-full">
@@ -328,19 +277,20 @@ export default function ApprovalsCockpit() {
                                     <tr>
                                         <th>System</th>
                                         <th>Module</th>
-                                        <th>Ref No</th>
-                                        <th>Branch</th>
-                                        <th>Account</th>
+
+                                        <th>Account No</th>
                                         <th>Customer</th>
-                                        <th>Event</th>
-                                        <th>Maker</th>
-                                        <th>Priority</th>
+                                        <th>Amount</th>
+                                        <th>Branch</th>
+                                        <th>Initiator</th>
                                         <th>Status</th>
+                                        <th className="text-center">Age</th>
+                                        <th className="text-center">Priority</th>
                                         <th className="text-center">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {currentApprovals.map((row, idx) => (
+                                    {approvals.map((row, idx) => (
                                         <tr
                                             key={idx}
                                             onClick={() => setSelectedTxn(row.txnId)}
@@ -352,44 +302,39 @@ export default function ApprovalsCockpit() {
                                                 </span>
                                             </td>
                                             <td className="font-medium text-slate-700">{row.module}</td>
-                                            <td className="font-mono text-xs text-slate-600 truncate max-w-[100px]" title={row.txnId}>{row.txnId}</td>
-                                            <td className="text-xs text-slate-600">
-                                                <div className="font-bold">{row.branchCode}</div>
-                                                <div className="text-[10px] text-slate-400 truncate max-w-[80px]">{row.branchName}</div>
+
+                                            <td className="font-mono text-xs text-slate-600 truncate max-w-[100px]">{row.accountNumber}</td>
+                                            <td className="font-medium text-slate-800 truncate max-w-[100px]">{row.customerName}</td>
+                                            <td className="font-bold text-slate-900">{formatCurrency(row.amount)}</td>
+                                            <td className="truncate max-w-[80px] text-slate-600">{row.branch}</td>
+                                            <td className="text-xs text-slate-500">{row.initiator}</td>
+                                            <td>
+                                                <span className="badge badge-status">
+                                                    {row.status}
+                                                </span>
                                             </td>
-                                            <td className="text-xs text-slate-600">
-                                                <div className="font-mono">{row.accountNumber}</div>
-                                                <div className="text-[10px] font-bold text-slate-500">{row.accountCurrency}</div>
-                                            </td>
-                                            <td className="text-xs text-slate-600">
-                                                <div className="font-medium truncate max-w-[100px]" title={row.customerName}>{row.customerName}</div>
-                                                <div className="text-[10px] text-slate-400">{row.customerNo}</div>
-                                            </td>
-                                            <td className="text-xs text-slate-500 truncate max-w-[100px]" title={row.event}>{row.event}</td>
-                                            <td className="text-xs text-slate-500">
-                                                <div className="font-medium">{row.makerId}</div>
-                                                <div className="text-[10px] text-slate-400">{row.makerName}</div>
-                                            </td>
+                                            <td className="text-center font-medium text-slate-600">{row.ageMinutes}</td>
                                             <td className="text-center">
                                                 <span className={`badge ${row.priority === 'High' ? 'badge-priority-high' : 'badge-priority-normal'}`}>
                                                     {row.priority || 'Normal'}
                                                 </span>
                                             </td>
                                             <td>
-                                                <span className="badge badge-status">
-                                                    {row.status}
-                                                </span>
-                                            </td>
-                                            <td>
-                                                <div className="flex items-center justify-center gap-2">
-                                                    <button className="w-7 h-7 rounded-full bg-green-50 text-green-600 flex items-center justify-center hover:bg-green-100 transition-colors border border-green-100">
-                                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <div className="flex items-center justify-center gap-3">
+                                                    <button className="w-8 h-8 rounded-full bg-green-50 text-green-600 flex items-center justify-center hover:bg-green-100 transition-colors border border-green-100">
+                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
                                                         </svg>
                                                     </button>
-                                                    <button className="w-7 h-7 rounded-full bg-red-50 text-red-600 flex items-center justify-center hover:bg-red-100 transition-colors border border-red-100">
-                                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <button className="w-8 h-8 rounded-full bg-red-50 text-red-600 flex items-center justify-center hover:bg-red-100 transition-colors border border-red-100">
+                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
+                                                        </svg>
+                                                    </button>
+                                                    <button className="w-8 h-8 rounded-full bg-gray-50 text-gray-600 flex items-center justify-center hover:bg-gray-100 transition-colors border border-gray-200">
+                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                                         </svg>
                                                     </button>
                                                 </div>
@@ -399,52 +344,16 @@ export default function ApprovalsCockpit() {
                                 </tbody>
                             </table>
                         </div>
-
-                        {/* Pagination Controls */}
-                        <div className="p-4 border-t border-gray-200 flex justify-between items-center gap-2 bg-gray-50/50">
-                            <span className="text-xs text-slate-500 font-medium">
-                                Showing {startIndex + 1}-{Math.min(startIndex + itemsPerPage, approvals.length)} of {approvals.length}
-                            </span>
-                            <div className="flex gap-1 items-center">
-                                <button
-                                    onClick={() => handlePageChange(currentPage - 1)}
-                                    disabled={currentPage === 1}
-                                    className="w-8 h-8 rounded-md border border-gray-200 flex items-center justify-center text-gray-400 hover:bg-white hover:text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed bg-white shadow-sm transition-all"
-                                >
+                        <div className="p-4 border-t border-gray-200 flex justify-end items-center gap-2 bg-gray-50/50">
+                            <span className="text-xs text-slate-500 mr-3 font-medium">Page 1 of 1</span>
+                            <div className="flex gap-1">
+                                <button className="w-8 h-8 rounded-md border border-gray-200 flex items-center justify-center text-gray-400 hover:bg-white hover:text-gray-600 disabled:opacity-50 bg-white shadow-sm" disabled>
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
                                     </svg>
                                 </button>
-
-                                {/* Simple Pagination Numbers */}
-                                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                                    let startPage = 1;
-                                    if (totalPages > 5) {
-                                        if (currentPage <= 3) startPage = 1;
-                                        else if (currentPage >= totalPages - 2) startPage = totalPages - 4;
-                                        else startPage = currentPage - 2;
-                                    }
-                                    const pageNum = startPage + i;
-
-                                    return (
-                                        <button
-                                            key={pageNum}
-                                            onClick={() => handlePageChange(pageNum)}
-                                            className={`w-8 h-8 rounded-md border flex items-center justify-center text-sm font-bold shadow-sm transition-all ${currentPage === pageNum
-                                                ? 'border-blue-500 bg-blue-600 text-white'
-                                                : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
-                                                }`}
-                                        >
-                                            {pageNum}
-                                        </button>
-                                    );
-                                })}
-
-                                <button
-                                    onClick={() => handlePageChange(currentPage + 1)}
-                                    disabled={currentPage === totalPages || totalPages === 0}
-                                    className="w-8 h-8 rounded-md border border-gray-200 flex items-center justify-center text-gray-400 hover:bg-white hover:text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed bg-white shadow-sm transition-all"
-                                >
+                                <button className="w-8 h-8 rounded-md border border-blue-500 bg-blue-600 text-white flex items-center justify-center text-sm font-bold shadow-sm">1</button>
+                                <button className="w-8 h-8 rounded-md border border-gray-200 flex items-center justify-center text-gray-400 hover:bg-white hover:text-gray-600 disabled:opacity-50 bg-white shadow-sm" disabled>
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
                                     </svg>
