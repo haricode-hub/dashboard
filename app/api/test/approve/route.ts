@@ -12,7 +12,11 @@ export async function POST(request: Request) {
 
         // Step 1: Fetch Full Record Details
         // Updated URL to include CustomerAccountService based on the POST URL pattern
-        const queryUrl = `http://192.168.3.245:8002/CustomerAccountService/CustomerAccount/QueryCustAcc/brn/${brn}/acc/${acc}`;
+        const queryBaseUrl = process.env.CUSTOMER_ACCOUNT_QUERY_URL;
+        if (!queryBaseUrl) {
+            return NextResponse.json({ error: "Configuration Error: CUSTOMER_ACCOUNT_QUERY_URL missing" }, { status: 500 });
+        }
+        const queryUrl = `${queryBaseUrl}/brn/${brn}/acc/${acc}`;
         console.log(`Fetching from: ${queryUrl}`);
 
         const queryRes = await fetch(queryUrl, {
@@ -46,7 +50,10 @@ export async function POST(request: Request) {
         const payload = queryData.custaccount;
 
         // Step 3: Authorize Record (POST)
-        const authUrl = "http://192.168.3.245:8002/CustomerAccountService/CustomerAccount/AuthorizeCustAcc";
+        const authUrl = process.env.CUSTOMER_ACCOUNT_AUTH_URL;
+        if (!authUrl) {
+            return NextResponse.json({ error: "Configuration Error: CUSTOMER_ACCOUNT_AUTH_URL missing" }, { status: 500 });
+        }
         console.log(`Authorizing at: ${authUrl}`);
 
         const authRes = await fetch(authUrl, {

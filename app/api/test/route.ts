@@ -34,8 +34,7 @@ export async function GET() {
             if (res.ok) {
                 data = await res.json();
                 if (Array.isArray(data) && data.length > 0) {
-                    console.log("First record keys:", Object.keys(data[0]));
-                    console.log("First record sample:", JSON.stringify(data[0]).substring(0, 200));
+                    // Debug logging removed
                 }
                 break; // Success, exit loop
             } else {
