@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 
 interface Approval {
     sourceSystem: string;
@@ -28,6 +28,10 @@ export default function TestCockpit() {
     const [detailsData, setDetailsData] = useState<any>(null);
     const [loadingDetails, setLoadingDetails] = useState(false);
     const [showAllFields, setShowAllFields] = useState(false);
+    const [notificationCount, setNotificationCount] = useState(0);
+    const [isShaking, setIsShaking] = useState(false);
+    const firstLoad = useRef(true);
+    const prevApprovalsLengthRef = useRef(0); // Restored for robust fallback detection
 
     // Derived state for charts
     const systemCounts = approvals.reduce((acc, curr) => {
@@ -47,6 +51,95 @@ export default function TestCockpit() {
         return colors[system] || "bg-gray-500";
     };
 
+    // Notification System State
+    const [notifications, setNotifications] = useState<{ id: string, text: string, time: Date, txnId: string }[]>([]);
+    const [showNotifications, setShowNotifications] = useState(false);
+    const seenTxnIdsRef = useRef<Set<string>>(new Set());
+
+    // Audio Context Ref
+    const audioContextRef = useRef<AudioContext | null>(null);
+
+    // Initialize Audio Context on user interaction to bypass autoplay policy
+    useEffect(() => {
+        const unlockAudio = () => {
+            const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+            if (!AudioContext) return;
+
+            if (!audioContextRef.current) {
+                audioContextRef.current = new AudioContext();
+            }
+
+            if (audioContextRef.current.state === 'suspended') {
+                audioContextRef.current.resume().then(() => {
+                    console.log("AudioContext unlocked/resumed");
+                }).catch(e => console.error("Audio resume failed", e));
+            }
+        };
+
+        // Listen for any interaction
+        window.addEventListener('click', unlockAudio);
+        window.addEventListener('keydown', unlockAudio);
+        window.addEventListener('touchstart', unlockAudio);
+
+        return () => {
+            window.removeEventListener('click', unlockAudio);
+            window.removeEventListener('keydown', unlockAudio);
+            window.removeEventListener('touchstart', unlockAudio);
+        };
+    }, []);
+
+    const playNotificationSound = () => {
+        try {
+            const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+            if (!AudioContext) return;
+
+            // Use ref context or create new if missing
+            if (!audioContextRef.current) {
+                audioContextRef.current = new AudioContext();
+            }
+
+            const ctx = audioContextRef.current;
+
+            // Try to resume if suspended
+            if (ctx.state === 'suspended') {
+                ctx.resume().catch(e => console.error(e));
+            }
+
+            const now = ctx.currentTime;
+
+            const createTone = (freq: number, startTime: number, duration: number) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(freq, startTime);
+
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+
+                // Smooth Attack and Decay for "Glassy" feel
+                gain.gain.setValueAtTime(0, startTime);
+                gain.gain.linearRampToValueAtTime(0.15, startTime + 0.05); // Attack
+                gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration); // Decay
+
+                osc.start(startTime);
+                osc.stop(startTime + duration);
+            };
+
+            // Sequence: C5 (523.25), E5 (659.25), G5 (783.99)
+            // Rapid sequence for a "Ding-Dong-Ding" effect
+            createTone(523.25, now, 0.6);
+            createTone(659.25, now + 0.1, 0.6);
+            createTone(783.99, now + 0.2, 0.8);
+
+        } catch (e) {
+            console.error("Audio play failed", e);
+        }
+    };
+
+    // Test Trigger
+
+
     const systemStats = Object.keys(systemCounts).map(system => ({
         name: system,
         value: systemCounts[system],
@@ -62,6 +155,61 @@ export default function TestCockpit() {
             const data = await res.json();
 
             if (Array.isArray(data)) {
+                // Initialize seen set on first load
+                if (firstLoad.current) {
+                    data.forEach((item: Approval) => seenTxnIdsRef.current.add(item.txnId));
+                    prevApprovalsLengthRef.current = data.length;
+                    firstLoad.current = false;
+                } else {
+                    // 1. Precise Detection: Check for new IDs
+                    const newItems = data.filter((item: Approval) => !seenTxnIdsRef.current.has(item.txnId));
+
+                    // 2. Fallback Detection: Check if total count increased (covers cases where IDs might be reused/garbage or API behaves oddly)
+                    const countIncreased = data.length > prevApprovalsLengthRef.current;
+                    const hasNewContent = newItems.length > 0 || countIncreased;
+
+                    if (hasNewContent) {
+                        // Play Sound & Visual Effect
+                        console.log("🔔 Notification Triggered!", { newItems: newItems.length, countDiff: data.length - prevApprovalsLengthRef.current });
+                        playNotificationSound();
+                        setIsShaking(true);
+                        setTimeout(() => setIsShaking(false), 1000); // Reset shake after animation
+
+                        // Add to notifications dropdown (Prefer precise new items, but fallback to generic msg if only count changed)
+                        let newNotifs: any[] = [];
+
+                        if (newItems.length > 0) {
+                            newNotifs = newItems.map((item: Approval) => ({
+                                id: Math.random().toString(36).substr(2, 9),
+                                text: `New request with Account no ${item.accountNumber}`,
+                                time: new Date(),
+                                txnId: item.txnId
+                            }));
+                        } else if (countIncreased) {
+                            // Generic notification if we detected a count increase but no specific "New" ID
+                            // Force Update: User seeing stale code.
+                            newNotifs = [{
+                                id: Math.random().toString(36).substr(2, 9),
+                                text: `New request with Account no ${data[0]?.accountNumber || 'Unknown'}`,
+                                time: new Date(),
+                                txnId: data[0]?.txnId
+                            }];
+                        }
+
+                        if (newNotifs.length > 0) {
+                            setNotifications(prev => [...newNotifs, ...prev]);
+                            setNotificationCount(prev => prev + newNotifs.length);
+                        }
+
+                        // Update State Tracking
+                        newItems.forEach((item: Approval) => seenTxnIdsRef.current.add(item.txnId));
+                        prevApprovalsLengthRef.current = data.length;
+                    } else {
+                        // Sync length ref even if no new items (e.g. if count decreased)
+                        prevApprovalsLengthRef.current = data.length;
+                    }
+                }
+
                 setApprovals(data);
                 setLastRefresh(new Date());
                 if (data.length > 0 && !selectedTxn) {
@@ -334,12 +482,70 @@ export default function TestCockpit() {
                                 SL
                             </div>
                         </div>
-                        <button className="p-2 text-slate-300 hover:text-white relative hover:bg-white/10 rounded-full transition-colors">
-                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                            </svg>
-                            <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border border-slate-900"></span>
-                        </button>
+                        <div className="relative">
+                            <button
+                                onClick={() => {
+                                    setShowNotifications(!showNotifications);
+                                    if (!showNotifications) setNotificationCount(0); // Clear badge on open
+                                }}
+                                className={`p-2 relative rounded-full transition-all duration-200 ${isShaking ? 'animate-shake text-blue-500 bg-blue-50' : ''} ${showNotifications ? 'bg-white text-blue-600 shadow-md' : 'text-slate-300 hover:text-white hover:bg-white/10'}`}
+                            >
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                                </svg>
+                                {notificationCount > 0 && (
+                                    <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white border-2 border-slate-900 animate-pulse box-content">
+                                        {notificationCount > 9 ? '9+' : notificationCount}
+                                    </span>
+                                )}
+                            </button>
+
+                            {/* Dropdown Menu */}
+                            {showNotifications && (
+                                <div className="absolute right-0 top-12 w-80 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-50 animate-fade-in-up origin-top-right">
+                                    <div className="bg-slate-50 px-4 py-3 border-b border-gray-100 flex justify-between items-center">
+                                        <h3 className="font-bold text-slate-700 text-xs uppercase tracking-wide">Notifications</h3>
+                                        <button
+                                            onClick={() => setNotifications([])}
+                                            className="text-[10px] text-blue-500 hover:text-blue-700 font-semibold"
+                                        >
+                                            Clear All
+                                        </button>
+                                    </div>
+                                    <div className="max-h-[300px] overflow-y-auto">
+                                        {notifications.length > 0 ? (
+                                            notifications.map((notif) => (
+                                                <div
+                                                    key={notif.id}
+                                                    onClick={() => {
+                                                        setSelectedTxn(notif.txnId);
+                                                        setShowNotifications(false);
+                                                    }}
+                                                    className="p-4 border-b border-gray-50 hover:bg-blue-50/50 cursor-pointer transition-colors group"
+                                                >
+                                                    <div className="flex gap-3">
+                                                        <div className="w-2 h-2 mt-1.5 rounded-full bg-blue-500 group-hover:scale-110 transition-transform"></div>
+                                                        <div>
+                                                            <p className="text-sm text-slate-700 font-medium leading-snug">{notif.text}</p>
+                                                            <p className="text-[10px] text-slate-400 mt-1">{notif.time.toLocaleTimeString()}</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <div className="py-8 text-center px-6">
+                                                <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                                                    <svg className="w-6 h-6 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                                                    </svg>
+                                                </div>
+                                                <p className="text-xs text-slate-400 font-medium">No new notifications</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             </header>
