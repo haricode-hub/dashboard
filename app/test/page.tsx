@@ -17,6 +17,7 @@ interface Approval {
     timestamp: string;
     brn?: string;
     acc?: string;
+    ejLogId?: string;
 }
 
 export default function TestCockpit() {
@@ -381,7 +382,12 @@ export default function TestCockpit() {
             const res = await fetch('/api/test/details', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ brn, acc })
+                body: JSON.stringify({
+                    brn,
+                    acc,
+                    ejLogId: txn.ejLogId,
+                    system: txn.sourceSystem
+                })
             });
 
             const result = await res.json();

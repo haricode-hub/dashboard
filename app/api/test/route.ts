@@ -8,9 +8,10 @@ export async function GET(request: NextRequest) {
 
     // Case: OBBRN + Cash Deposit (New Requirement)
     if (systemParam === 'OBBRN' && moduleParam === 'Cash Deposit') {
-        const obbrnUrl = process.env.CUSTOMER_SERVICE_API_OBBRN;
+        // Use Env var or Fallback to the specific URL provided in instructions
+        const obbrnUrl = process.env.CUSTOMER_SERVICE_API_OBBRN || "http://192.168.3.245:8002/customer-service/api/v1/log/ejb";
 
-        if (!obbrnUrl) {
+        if (!obbrnUrl) { // Should not happen with fallback
             return NextResponse.json(
                 { error: "OBBRN API URL not configured" },
                 { status: 500 }
@@ -43,7 +44,8 @@ export async function GET(request: NextRequest) {
                 initiator: item.USER_ID || "System",
                 timestamp: item.TXN_TIME_RECEIVED || new Date().toISOString(),
                 brn: item.TXN_BRN_CODE || "000",
-                acc: item.ACCOUNT_NUMBER || "N/A"
+                acc: item.ACCOUNT_NUMBER || "N/A",
+                ejLogId: item.ID // ID needed for detailed view
             }));
 
             return NextResponse.json(formatted);
