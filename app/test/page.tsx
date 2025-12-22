@@ -37,7 +37,19 @@ export default function TestCockpit() {
     // Filter State
     const [tempSystem, setTempSystem] = useState('(All)');
     const [tempModule, setTempModule] = useState('(All)');
-    const activeFiltersRef = useRef({ system: '(All)', module: '(All)' });
+    const [tempBranch, setTempBranch] = useState('(All)');
+    const [tempStatus, setTempStatus] = useState('(Pending)');
+
+    // Store unique options derived from data
+    const [availableBranches, setAvailableBranches] = useState<string[]>([]);
+    const [availableStatuses, setAvailableStatuses] = useState<string[]>([]);
+
+    const activeFiltersRef = useRef({
+        system: '(All)',
+        module: '(All)',
+        branch: '(All)',
+        status: '(Pending)'
+    });
 
     // Derived state for charts
     const systemCounts = approvals.reduce((acc, curr) => {
@@ -159,15 +171,22 @@ export default function TestCockpit() {
         setLoading(true);
         try {
             // CHANGED: Fetch from /api/test with filters
-            const { system, module } = activeFiltersRef.current;
+            const { system, module, branch, status } = activeFiltersRef.current;
             const queryParams = new URLSearchParams();
             if (system !== '(All)') queryParams.append('system', system);
             if (module !== '(All)') queryParams.append('module', module);
+            if (branch !== '(All)') queryParams.append('branch', branch);
+            if (status !== '(Pending)' && status !== '(All)') queryParams.append('status', status);
 
             const res = await fetch(`/api/test?${queryParams.toString()}`, { cache: "no-store" });
             const data = await res.json();
 
             if (Array.isArray(data)) {
+                // Populate Dropdowns from Data (Accumulate distinct values)
+                const branches = Array.from(new Set(data.map((i: any) => i.branch))).sort();
+                const statuses = Array.from(new Set(data.map((i: any) => i.status))).sort();
+                setAvailableBranches(branches as string[]);
+                setAvailableStatuses(statuses as string[]);
                 // Initialize seen set on first load
                 // Initialize seen set on first load
                 if (firstLoad.current) {
@@ -284,7 +303,12 @@ export default function TestCockpit() {
             const res = await fetch('/api/test/approve', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ brn, acc })
+                body: JSON.stringify({
+                    brn,
+                    acc,
+                    ejLogId: txn.ejLogId,
+                    system: txn.sourceSystem
+                })
             });
 
             const result = await res.json();
@@ -587,6 +611,7 @@ export default function TestCockpit() {
                                     <option>(All)</option>
                                     <option>OBBRN</option>
                                     <option>FCUBS</option>
+                                    <option>OBPM</option>
                                 </select>
                             </div>
                             <div className="w-full">
@@ -598,19 +623,32 @@ export default function TestCockpit() {
                                 >
                                     <option>(All)</option>
                                     <option>Cash Deposit</option>
-                                    <option>Customer</option>
+                                    <option>Customer Account</option>
+                                    <option>Book Transfer</option>
+                                    <option>Nacha</option>
                                 </select>
                             </div>
                             <div className="w-full">
                                 <label className="text-xs font-bold text-slate-500 uppercase mb-2 block tracking-wide">Branch</label>
-                                <select className="form-select w-full bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5">
+                                <select
+                                    value={tempBranch}
+                                    onChange={(e) => setTempBranch(e.target.value)}
+                                    className="form-select w-full bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5"
+                                >
                                     <option>(All)</option>
+                                    {availableBranches.map(b => <option key={b}>{b}</option>)}
                                 </select>
                             </div>
                             <div className="w-full">
                                 <label className="text-xs font-bold text-slate-500 uppercase mb-2 block tracking-wide">Status</label>
-                                <select className="form-select w-full bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5">
+                                <select
+                                    value={tempStatus}
+                                    onChange={(e) => setTempStatus(e.target.value)}
+                                    className="form-select w-full bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5"
+                                >
                                     <option>(Pending)</option>
+                                    <option>(All)</option>
+                                    {availableStatuses.map(s => <option key={s}>{s}</option>)}
                                 </select>
                             </div>
                             <div className="w-full">
@@ -626,7 +664,12 @@ export default function TestCockpit() {
                             <div className="flex items-center gap-3 w-full md:w-auto">
                                 <button
                                     onClick={() => {
-                                        activeFiltersRef.current = { system: tempSystem, module: tempModule };
+                                        activeFiltersRef.current = {
+                                            system: tempSystem,
+                                            module: tempModule,
+                                            branch: tempBranch,
+                                            status: tempStatus
+                                        };
                                         loadApprovals();
                                     }}
                                     className="bg-teal-600 hover:bg-teal-700 text-white font-bold py-2.5 px-6 rounded-lg text-sm transition-all shadow-sm hover:shadow active:scale-95 uppercase tracking-wide"
@@ -701,12 +744,6 @@ export default function TestCockpit() {
                             <span className="text-4xl font-extrabold text-slate-800 leading-none">
                                 {approvals.filter(a => a.priority === 'High').length}
                             </span>
-                            <span className="text-red-500 flex items-center text-xs font-bold bg-red-50 px-2 py-1 rounded-full mb-1">
-                                <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                                </svg>
-                                +2
-                            </span>
                         </div>
                     </div>
 
@@ -746,12 +783,9 @@ export default function TestCockpit() {
                                         <th>Module</th>
 
                                         <th>Account No</th>
-                                        <th>Customer</th>
-                                        <th>Amount</th>
                                         <th>Branch</th>
                                         <th>Initiator</th>
                                         <th>Status</th>
-                                        <th className="text-center">Age</th>
                                         <th className="text-center">Priority</th>
                                         <th className="text-center">Actions</th>
                                     </tr>
@@ -771,8 +805,6 @@ export default function TestCockpit() {
                                             <td className="font-medium text-slate-700">{row.module}</td>
 
                                             <td className="font-mono text-xs text-slate-600 truncate max-w-[100px]">{row.accountNumber}</td>
-                                            <td className="font-medium text-slate-800 truncate max-w-[100px]">{row.customerName}</td>
-                                            <td className="font-bold text-slate-900">{formatCurrency(row.amount)}</td>
                                             <td className="truncate max-w-[80px] text-slate-600">{row.branch}</td>
                                             <td className="text-xs text-slate-500">{row.initiator}</td>
                                             <td>
@@ -780,7 +812,6 @@ export default function TestCockpit() {
                                                     {row.status}
                                                 </span>
                                             </td>
-                                            <td className="text-center font-medium text-slate-600">{row.ageMinutes}</td>
                                             <td className="text-center">
                                                 <span className={`badge ${row.priority === 'High' ? 'badge-priority-high' : 'badge-priority-normal'}`}>
                                                     {row.priority || 'Normal'}

@@ -13,7 +13,7 @@ export async function POST(request: Request) {
         // ==========================================
         // OBBRN Workflow: Authenticate & Fetch EJ Log
         // ==========================================
-        if (system === 'OBBRN') {
+        if (system && system.toUpperCase() === 'OBBRN') {
             console.log("Processing OBBRN Details Request...");
 
             if (!ejLogId) {
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json', // Fixed content-type
-                    'appId': 'SECSRV001',
+                    'appId': 'SRVCMNTXN',
                     'branchCode': '000',
                     'userId': 'TRAINEE2',
                     'entityId': 'DEFAULTENTITY',
@@ -92,38 +92,8 @@ export async function POST(request: Request) {
         // ==========================================
         // Default / FCUBS Workflow
         // ==========================================
-        if (!brn || !acc) {
-            return NextResponse.json({ error: "Missing brn or acc" }, { status: 400 });
-        }
-
-        const queryBaseUrl = process.env.CUSTOMER_ACCOUNT_QUERY_URL;
-        if (!queryBaseUrl) {
-            return NextResponse.json({ error: "Configuration Error: CUSTOMER_ACCOUNT_QUERY_URL missing" }, { status: 500 });
-        }
-        const queryUrl = `${queryBaseUrl}/brn/${brn}/acc/${acc}`;
-        console.log(`Fetching FCUBS details from: ${queryUrl}`);
-
-        const queryRes = await fetch(queryUrl, {
-            cache: 'no-store',
-            headers: {
-                'BRANCH': brn,
-                'Entity': 'ENTITY_ID1',
-                'Source': 'FCAT',
-                'Userid': 'SYSTEM'
-            }
-        });
-
-        if (!queryRes.ok) {
-            const errorText = await queryRes.text();
-            console.error(`Failed to fetch record: ${queryRes.status} ${queryRes.statusText}`, errorText);
-            return NextResponse.json({
-                error: `Failed to fetch record from ${queryUrl}: ${queryRes.status} ${queryRes.statusText}`,
-                details: errorText
-            }, { status: queryRes.status });
-        }
-
-        const queryData = await queryRes.json();
-        return NextResponse.json({ success: true, data: queryData });
+        // FCUBS Support Removed as per request
+        return NextResponse.json({ error: "FCUBS Details Fetching is disabled in /test" }, { status: 400 });
 
     } catch (error: any) {
         console.error("Details fetch error:", error);
