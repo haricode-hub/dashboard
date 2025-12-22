@@ -169,16 +169,17 @@ export default function TestCockpit() {
 
             if (Array.isArray(data)) {
                 // Initialize seen set on first load
+                // Initialize seen set on first load
                 if (firstLoad.current) {
-                    data.forEach((item: Approval) => seenTxnIdsRef.current.add(item.txnId));
+                    // Update the reference set to match current data
+                    seenTxnIdsRef.current = new Set(data.map((item: Approval) => item.txnId));
                     prevApprovalsLengthRef.current = data.length;
                     firstLoad.current = false;
                 } else {
-                    // 1. Precise Detection: Check for new IDs
+                    // 1. Precise Detection: Check for new IDs compared to LAST SNAPSHOT
                     const newItems = data.filter((item: Approval) => !seenTxnIdsRef.current.has(item.txnId));
 
                     // 2. Strict Detection: Only notify if we have actual NEW IDs
-                    // This prevents "count based" false positives if data refreshes without new items
                     const hasNewContent = newItems.length > 0;
 
                     if (hasNewContent) {
@@ -191,7 +192,9 @@ export default function TestCockpit() {
                         if ("serviceWorker" in navigator) {
                             navigator.serviceWorker.ready.then(reg => {
                                 reg.showNotification("Time for new update", {
-                                    body: "New approval requests pending",
+                                    body: newItems.length > 0
+                                        ? `New request with Account no ${newItems[0].accountNumber}`
+                                        : "New approval requests pending",
                                     icon: "/jmr-logo.png",
                                     tag: "jmr-approval", // Tag is required for renotify
                                     renotify: true,      // Play sound/vibrate again for new updates
@@ -201,31 +204,26 @@ export default function TestCockpit() {
                             }).catch(err => console.error("SW Notification failed", err));
                         }
 
-                        // Add to notifications dropdown (Prefer precise new items, but fallback to generic msg if only count changed)
-                        let newNotifs: any[] = [];
-
-                        if (newItems.length > 0) {
-                            newNotifs = newItems.map((item: Approval) => ({
-                                id: Math.random().toString(36).substr(2, 9),
-                                text: `New request with Account no ${item.accountNumber}`,
-                                time: new Date(),
-                                txnId: item.txnId
-                            }));
-
-                        }
+                        // Add to notifications dropdown
+                        const newNotifs = newItems.map((item: Approval) => ({
+                            id: Math.random().toString(36).substr(2, 9),
+                            text: `New request with Account no ${item.accountNumber}`,
+                            time: new Date(),
+                            txnId: item.txnId
+                        }));
 
                         if (newNotifs.length > 0) {
                             setNotifications(prev => [...newNotifs, ...prev]);
                             setNotificationCount(prev => prev + newNotifs.length);
                         }
-
-                        // Update State Tracking
-                        newItems.forEach((item: Approval) => seenTxnIdsRef.current.add(item.txnId));
-                        prevApprovalsLengthRef.current = data.length;
-                    } else {
-                        // Sync length ref even if no new items (e.g. if count decreased)
-                        prevApprovalsLengthRef.current = data.length;
                     }
+
+                    // CRITICAL FIX: Update the Snapshot to the CURRENT state
+                    // This creates a "Sliding Window" comparison.
+                    // If an item was approved and removed, it disappears from this Set.
+                    // If it comes back later, it will be distinct from the Set, triggering a new alert.
+                    seenTxnIdsRef.current = new Set(data.map((item: Approval) => item.txnId));
+                    prevApprovalsLengthRef.current = data.length;
                 }
 
                 setApprovals(data);

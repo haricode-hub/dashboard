@@ -104,8 +104,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (!data) {
-        console.warn("All fetch attempts failed. Using fallback MOCK data.");
-        // Mock Data for Testing/Offline Mode
+        console.warn("All fetch attempts failed. Returning empty list.");
         data = [];
     }
 
