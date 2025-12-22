@@ -153,6 +153,8 @@ export default function TestCockpit() {
         width: `${(systemCounts[system] / approvals.length) * 100}%`
     }));
 
+
+
     async function loadApprovals() {
         setLoading(true);
         try {
@@ -175,16 +177,29 @@ export default function TestCockpit() {
                     // 1. Precise Detection: Check for new IDs
                     const newItems = data.filter((item: Approval) => !seenTxnIdsRef.current.has(item.txnId));
 
-                    // 2. Fallback Detection: Check if total count increased (covers cases where IDs might be reused/garbage or API behaves oddly)
-                    const countIncreased = data.length > prevApprovalsLengthRef.current;
-                    const hasNewContent = newItems.length > 0 || countIncreased;
+                    // 2. Strict Detection: Only notify if we have actual NEW IDs
+                    // This prevents "count based" false positives if data refreshes without new items
+                    const hasNewContent = newItems.length > 0;
 
                     if (hasNewContent) {
                         // Play Sound & Visual Effect
-                        console.log("🔔 Notification Triggered!", { newItems: newItems.length, countDiff: data.length - prevApprovalsLengthRef.current });
                         playNotificationSound();
                         setIsShaking(true);
                         setTimeout(() => setIsShaking(false), 1000); // Reset shake after animation
+
+                        // TRIGGER PUSH NOTIFICATION (Service Worker)
+                        if ("serviceWorker" in navigator) {
+                            navigator.serviceWorker.ready.then(reg => {
+                                reg.showNotification("Time for new update", {
+                                    body: "New approval requests pending",
+                                    icon: "/jmr-logo.png",
+                                    tag: "jmr-approval", // Tag is required for renotify
+                                    renotify: true,      // Play sound/vibrate again for new updates
+                                    requireInteraction: true, // Keep on screen until user clicks
+                                    silent: false
+                                } as any);
+                            }).catch(err => console.error("SW Notification failed", err));
+                        }
 
                         // Add to notifications dropdown (Prefer precise new items, but fallback to generic msg if only count changed)
                         let newNotifs: any[] = [];
@@ -196,15 +211,7 @@ export default function TestCockpit() {
                                 time: new Date(),
                                 txnId: item.txnId
                             }));
-                        } else if (countIncreased) {
-                            // Generic notification if we detected a count increase but no specific "New" ID
-                            // Force Update: User seeing stale code.
-                            newNotifs = [{
-                                id: Math.random().toString(36).substr(2, 9),
-                                text: `New request with Account no ${data[0]?.accountNumber || 'Unknown'}`,
-                                time: new Date(),
-                                txnId: data[0]?.txnId
-                            }];
+
                         }
 
                         if (newNotifs.length > 0) {
@@ -242,7 +249,7 @@ export default function TestCockpit() {
 
     useEffect(() => {
         loadApprovals();
-        const interval = setInterval(loadApprovals, 10000);
+        const interval = setInterval(loadApprovals, 3000);
         return () => clearInterval(interval);
     }, []);
 
