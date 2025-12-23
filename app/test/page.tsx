@@ -79,6 +79,13 @@ export default function TestCockpit() {
 
     // Initialize Audio Context on user interaction to bypass autoplay policy
     useEffect(() => {
+        // Request Notification Permission on load
+        if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
+            Notification.requestPermission().then(permission => {
+                console.log("Notification permission:", permission);
+            });
+        }
+
         const unlockAudio = () => {
             const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
             if (!AudioContext) return;
