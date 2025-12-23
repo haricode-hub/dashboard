@@ -217,9 +217,9 @@ export default function TestCockpit() {
                         // TRIGGER PUSH NOTIFICATION (Service Worker)
                         if ("serviceWorker" in navigator) {
                             navigator.serviceWorker.ready.then(reg => {
-                                reg.showNotification("Time for new update", {
+                                reg.showNotification("New Approval Request", {
                                     body: newItems.length > 0
-                                        ? `New request with Account no ${newItems[0].accountNumber}`
+                                        ? `New request with Reference ID ${newItems[0].txnId}`
                                         : "New approval requests pending",
                                     icon: "/jmr-logo.png",
                                     tag: "jmr-approval", // Tag is required for renotify
@@ -233,7 +233,7 @@ export default function TestCockpit() {
                         // Add to notifications dropdown
                         const newNotifs = newItems.map((item: Approval) => ({
                             id: Math.random().toString(36).substr(2, 9),
-                            text: `New request with Account no ${item.accountNumber}`,
+                            text: `New request with Reference ID ${item.txnId}`,
                             time: new Date(),
                             txnId: item.txnId
                         }));
@@ -272,7 +272,7 @@ export default function TestCockpit() {
 
     useEffect(() => {
         loadApprovals();
-        const interval = setInterval(loadApprovals, 3000);
+        const interval = setInterval(loadApprovals, 5000);
         return () => clearInterval(interval);
     }, []);
 
