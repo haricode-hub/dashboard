@@ -13,14 +13,93 @@ export async function POST(request: Request) {
         if (system && system.toUpperCase() === 'OBBRN') {
             return await handleObbrnApproval(body);
         } else {
-            // Default to FCUBS for specific system 'FCUBS' or any other legacy default
-            return NextResponse.json({ error: "FCUBS Approval is disabled in /test" }, { status: 400 });
+            // Default to FCUBS
+            return await handleFcubsApproval(body);
         }
 
     } catch (error: any) {
         console.error("Approval workflow error:", error);
         return NextResponse.json({ error: error.message || "Internal Server Error" }, { status: 500 });
     }
+}
+
+// ==========================================
+// FCUBS Workflow Implementation
+// ==========================================
+async function handleFcubsApproval(body: any) {
+    const { brn, acc } = body;
+
+    if (!brn || !acc) {
+        return NextResponse.json({ error: "Missing brn or acc" }, { status: 400 });
+    }
+
+    // Step 1: Fetch Full Record Details
+    // Updated URL to include CustomerAccountService based on the POST URL pattern
+    const queryUrl = `http://192.168.3.245:8002/CustomerAccountService/CustomerAccount/QueryCustAcc/brn/${brn}/acc/${acc}`;
+    console.log(`Fetching from: ${queryUrl}`);
+
+    const queryRes = await fetch(queryUrl, {
+        cache: 'no-store',
+        headers: {
+            'BRANCH': brn, // Use the branch from the request
+            'Entity': 'ENTITY_ID1',
+            'Source': 'FCAT',
+            'Userid': 'SYSTEM'
+        }
+    });
+
+    if (!queryRes.ok) {
+        const errorText = await queryRes.text();
+        console.error(`Failed to fetch record: ${queryRes.status} ${queryRes.statusText}`, errorText);
+        return NextResponse.json({
+            error: `Failed to fetch record from ${queryUrl}: ${queryRes.status} ${queryRes.statusText}`,
+            details: errorText
+        }, { status: queryRes.status });
+    }
+
+    const queryData = await queryRes.json();
+
+    // Step 2: Payload Transformation
+    // Extract the content of the custaccount key directly.
+    if (!queryData.custaccount) {
+        console.error("Invalid response format: missing custaccount", queryData);
+        return NextResponse.json({ error: "Invalid response format: missing custaccount" }, { status: 500 });
+    }
+
+    const payload = queryData.custaccount;
+
+    // Step 3: Authorize Record (POST)
+    const authUrl = "http://192.168.3.245:8002/CustomerAccountService/CustomerAccount/AuthorizeCustAcc";
+    console.log(`Authorizing at: ${authUrl}`);
+
+    const authRes = await fetch(authUrl, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'BRANCH': '000',
+            'Entity': 'ENTITY_ID1',
+            'Source': 'FCAT',
+            'Userid': 'SYSTEM'
+        },
+        body: JSON.stringify(payload)
+    });
+
+    if (!authRes.ok) {
+        const errorText = await authRes.text();
+        console.error(`Authorization failed: ${authRes.status} ${authRes.statusText}`, errorText);
+        return NextResponse.json({ error: `Authorization failed: ${authRes.status} ${authRes.statusText}`, details: errorText }, { status: authRes.status });
+    }
+
+    // The response might be JSON or text, handle safely
+    let authData;
+    const authResText = await authRes.text();
+    try {
+        authData = JSON.parse(authResText);
+    } catch (e) {
+        authData = { message: authResText };
+    }
+
+    return NextResponse.json({ success: true, data: authData });
 }
 
 // ==========================================

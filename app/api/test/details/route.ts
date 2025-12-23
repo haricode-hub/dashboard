@@ -90,10 +90,36 @@ export async function POST(request: Request) {
         }
 
         // ==========================================
-        // Default / FCUBS Workflow
+        // FCUBS Workflow: Just Fetch Details
         // ==========================================
-        // FCUBS Support Removed as per request
-        return NextResponse.json({ error: "FCUBS Details Fetching is disabled in /test" }, { status: 400 });
+        if (!brn || !acc) {
+            return NextResponse.json({ error: "Missing brn or acc for FCUBS details" }, { status: 400 });
+        }
+
+        const queryUrl = `http://192.168.3.245:8002/CustomerAccountService/CustomerAccount/QueryCustAcc/brn/${brn}/acc/${acc}`;
+        console.log(`Fetching FCUBS details from: ${queryUrl}`);
+
+        const queryRes = await fetch(queryUrl, {
+            cache: 'no-store',
+            headers: {
+                'BRANCH': brn,
+                'Entity': 'ENTITY_ID1',
+                'Source': 'FCAT',
+                'Userid': 'SYSTEM'
+            }
+        });
+
+        if (!queryRes.ok) {
+            const errorText = await queryRes.text();
+            console.error(`FCUBS Fetch Failed: ${queryRes.status}`, errorText);
+            return NextResponse.json({
+                error: `Failed to fetch record from ${queryUrl}: ${queryRes.status} ${queryRes.statusText}`,
+                details: errorText
+            }, { status: queryRes.status });
+        }
+
+        const queryData = await queryRes.json();
+        return NextResponse.json({ success: true, data: queryData });
 
     } catch (error: any) {
         console.error("Details fetch error:", error);
