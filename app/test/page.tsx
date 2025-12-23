@@ -247,9 +247,8 @@ export default function TestCockpit() {
 
                 setApprovals(data);
                 setLastRefresh(new Date());
-                if (data.length > 0 && !selectedTxn) {
-                    setSelectedTxn(data[0].txnId);
-                }
+                // REMOVED: Auto-selection was causing selectedTxn to be overwritten during polling
+                // User's explicit selection should be preserved
             } else {
                 console.error("API Error:", data.error);
                 if (data.details) {
@@ -279,11 +278,21 @@ export default function TestCockpit() {
     };
 
     const handleApprove = async (txnId?: string) => {
+        console.log("handleApprove called with txnId:", txnId, "selectedTxn:", selectedTxn);
         const targetTxnId = txnId || selectedTxn;
-        if (!targetTxnId) return;
+        if (!targetTxnId) {
+            console.error("No transaction selected. Please click on a row first.");
+            alert("No transaction selected. Please click on a row first.");
+            return;
+        }
 
         const txn = approvals.find(a => a.txnId === targetTxnId);
-        if (!txn) return;
+        console.log("Found transaction:", txn);
+        if (!txn) {
+            console.error("Transaction not found in approvals list:", targetTxnId);
+            alert("Transaction not found. Please refresh and try again.");
+            return;
+        }
 
         // Use brn/acc if available, otherwise fallback to branch/accountNumber or defaults
         const brn = txn.brn || txn.branch || "000";
@@ -823,6 +832,7 @@ export default function TestCockpit() {
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation();
+                                                            setSelectedTxn(row.txnId); // Select this transaction
                                                             handleViewDetails(row.txnId);
                                                         }}
                                                         className="w-8 h-8 rounded-full bg-gray-50 text-gray-600 flex items-center justify-center hover:bg-gray-100 transition-colors border border-gray-200"
@@ -889,7 +899,11 @@ export default function TestCockpit() {
                             <div className="border-b border-gray-100 pb-4 mb-5">
                                 <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wide mb-1">Account no</h3>
                                 <div className="flex items-center justify-between">
-                                    <p className="text-lg font-mono font-bold text-blue-600">{selectedTxn || '---'}</p>
+                                    <p className="text-lg font-mono font-bold text-blue-600">
+                                        {selectedTxn
+                                            ? (approvals.find(a => a.txnId === selectedTxn)?.accountNumber || '---')
+                                            : '---'}
+                                    </p>
                                     <span className="badge badge-status text-[10px] px-2 py-0.5">Pending</span>
                                 </div>
                             </div>
