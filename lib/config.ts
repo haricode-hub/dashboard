@@ -18,7 +18,6 @@ export const config = {
         ejLogUrl: process.env.OBBRN_EJ_LOG_URL || '',
         approveUrl: process.env.OBBRN_APPROVE_URL || '',
         defaultUser: process.env.OBBRN_USERNAME || '',
-        defaultPassword: process.env.OBBRN_PASSWORD || '',
         appIdView: 'SECSRV001',
         appIdApprove: 'SRVBRANCHCOMMON',
         entityId: 'DEFAULTENTITY',
