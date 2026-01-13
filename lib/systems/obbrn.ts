@@ -22,9 +22,6 @@ export class ObbrnAdapter implements SystemAdapter {
                 'Accept': 'application/json, text/javascript, */*; q=0.01',
                 'Connection': 'keep-alive',
                 'Content-Type': 'application/json',
-                'Host': config.obbrn.headers.host,
-                'Origin': config.obbrn.headers.origin,
-                'Referer': config.obbrn.headers.referer,
                 // Correct AppID for Details Fetch as per legacy logic
                 'appId': 'SRVCMNTXN',
                 'branchCode': brn || '000',
@@ -136,7 +133,6 @@ export class ObbrnAdapter implements SystemAdapter {
                 'entityId': config.obbrn.entityId,
                 'sourceCode': config.obbrn.sourceCode
             },
-            body: JSON.stringify({ "username": config.obbrn.defaultUser, "password": config.obbrn.defaultPassword })
         });
 
         if (!res.ok) {

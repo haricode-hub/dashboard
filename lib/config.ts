@@ -17,16 +17,12 @@ export const config = {
         authUrl: process.env.OBBRN_AUTH_URL || '',
         ejLogUrl: process.env.OBBRN_EJ_LOG_URL || '',
         approveUrl: process.env.OBBRN_APPROVE_URL || '',
-        defaultUser: 'TRAINEE2',
-        defaultPassword: 'T3JhY2xlQDMyMQ==', // Consider moving to secret management in prod
+        defaultUser: process.env.OBBRN_USERNAME || '',
+        defaultPassword: process.env.OBBRN_PASSWORD || '',
         appIdView: 'SECSRV001',
         appIdApprove: 'SRVBRANCHCOMMON',
         entityId: 'DEFAULTENTITY',
         sourceCode: 'FCUBS',
-        headers: {
-            host: process.env.OBBRN_HOST || '192.168.3.59:8112',
-            origin: process.env.OBBRN_ORIGIN || 'https://192.168.3.59:8102',
-            referer: process.env.OBBRN_REFERER || 'https://192.168.3.59:8102/',
-        }
+        headers: {}
     },
 };
