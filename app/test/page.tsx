@@ -25,10 +25,8 @@ interface Approval {
 }
 
 function TestCockpitContent() {
-    const searchParams = useSearchParams();
-    // Get user from URL (e.g. ?user=ALLU) or fallback to config/default
-    const initialUser = searchParams.get('user') || "TRAINEE2";
-    const [activeUser, setActiveUser] = useState(initialUser);
+    // const searchParams = useSearchParams();
+    const [activeUser, setActiveUser] = useState("");
 
     const [approvals, setApprovals] = useState<Approval[]>([]);
     const [loading, setLoading] = useState(true);
@@ -66,7 +64,20 @@ function TestCockpitContent() {
     });
 
     // Ref to hold the active user to avoid stale closures in setInterval
-    const activeUserRef = useRef(initialUser);
+    const activeUserRef = useRef("");
+
+    // Identify User
+    useEffect(() => {
+        fetch('/api/auth/me')
+            .then(res => res.json())
+            .then(data => {
+                if (data.user) {
+                    setActiveUser(data.user);
+                    activeUserRef.current = data.user;
+                }
+            })
+            .catch(err => console.error("Auth check failed", err));
+    }, []);
 
 
     // Derived state for charts
@@ -294,10 +305,12 @@ function TestCockpitContent() {
     }
 
     useEffect(() => {
-        loadApprovals();
+        if (activeUser) {
+            loadApprovals();
+        }
         const interval = setInterval(loadApprovals, 5000);
         return () => clearInterval(interval);
-    }, []);
+    }, [activeUser]);
 
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('en-US', {
@@ -468,7 +481,8 @@ function TestCockpitContent() {
                     brn,
                     acc,
                     ejLogId: txn.ejLogId,
-                    system: txn.sourceSystem
+                    system: txn.sourceSystem,
+                    userId: activeUser
                 })
             });
 
